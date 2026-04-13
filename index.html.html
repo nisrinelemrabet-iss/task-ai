@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Task Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Design Tokens ──────────────────────────────── */
+  :root {
+    --bg:        #0e0f11;
+    --surface:   #16181c;
+    --surface2:  #1e2026;
+    --border:    rgba(255,255,255,0.07);
+    --border2:   rgba(255,255,255,0.14);
+    --text:      #f0ede8;
+    --muted:     #6e7280;
+    --accent:    #c8f15a;
+    --accent-dim:#8fb33a;
+    --danger:    #f87171;
+    --warning:   #fbbf24;
+    --radius:    12px;
+    --radius-sm: 8px;
+  }
+
+  /* ── Reset ──────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* ── Page Entry Animation ───────────────────────── */
+  @keyframes fadeUp {
+    from { opacity:0; transform: translateY(16px); }
+    to   { opacity:1; transform: translateY(0); }
+  }
+  .fade-up { animation: fadeUp 0.5s ease both; }
+  .delay-1 { animation-delay: 0.1s; }
+  .delay-2 { animation-delay: 0.2s; }
+  .delay-3 { animation-delay: 0.3s; }
+
+  /* ── Layout ─────────────────────────────────────── */
+  .wrapper { max-width: 720px; margin: 0 auto; }
+
+  /* ── Header ─────────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 2.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+  }
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  h1 em { font-style: italic; color: var(--accent); }
+  .tagline { font-size: 12px; color: var(--muted); margin-top: 2px; letter-spacing: 0.04em; text-transform: uppercase; }
+
+  /* ── API Key Banner ──────────────────────────────── */
+  .api-banner {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+  .api-banner label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .api-banner input {
+    flex: 1;
+    min-width: 180px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 7px 12px;
+    color: var(--text);
+    font-family: 'DM Sans', monospace;
+    font-size: 13px;
+  }
+  .api-banner input:focus { outline: none; border-color: var(--accent); }
+  .api-banner .save-btn {
+    padding: 7px 16px;
+    background: var(--accent);
+    color: #0e0f11;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: opacity 0.15s;
+  }
+  .api-banner .save-btn:hover { opacity: 0.85; }
+  .api-status { font-size: 11px; padding: 3px 9px; border-radius: 20px; }
+  .api-status.set { background: rgba(200,241,90,0.12); color: var(--accent); }
+  .api-status.unset { background: rgba(248,113,113,0.12); color: var(--danger); }
+
+  /* ── Stats ───────────────────────────────────────── */
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  .stat:hover { border-color: var(--border2); }
+  .stat-num { font-family: 'DM Serif Display', serif; font-size: 26px; color: var(--text); }
+  .stat-num.accent { color: var(--accent); }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* ── Natural Language Input ──────────────────────── */
+  .nl-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+  }
+  .nl-bar:focus-within { border-color: var(--accent); }
+  .nl-bar input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .nl-bar input:focus { outline: none; }
+  .nl-bar input::placeholder { color: var(--muted); }
+  .nl-hint { font-size: 11px; color: var(--muted); margin-bottom: 1rem; padding-left: 2px; }
+  .nl-hint span { color: var(--accent-dim); }
+
+  /* ── Buttons ─────────────────────────────────────── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: transparent;
+    color: var(--text);
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .btn:hover { background: var(--surface2); border-color: var(--border2); }
+  .btn:active { transform: scale(0.97); }
+  .btn-accent {
+    background: var(--accent);
+    color: #0e0f11;
+    border-color: transparent;
+    font-weight: 500;
+  }
+  .btn-accent:hover { background: var(--accent-dim); }
+  .btn-sm { padding: 5px 12px; font-size: 12px; }
+  .btn-icon {
+    width: 30px; height: 30px;
+    padding: 0;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    border-color: transparent;
+    color: var(--muted);
+  }
+  .btn-icon:hover { background: var(--surface2); color: var(--text); border-color: var(--border); }
+
+  /* ── Filters ─────────────────────────────────────── */
+  .filter-row { display: flex; gap: 6px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-pill {
+    padding: 5px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s;
+  }
+  .filter-pill:hover { color: var(--text); border-color: var(--border2); }
+  .filter-pill.active { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+
+  /* ── Task List ───────────────────────────────────── */
+  .task-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .task-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    transition: border-color 0.2s, opacity 0.2s;
+    animation: fadeUp 0.3s ease both;
+  }
+  .task-card:hover { border-color: var(--border2); }
+  .task-card.done { opacity: 0.4; }
+
+  .task-top { display: flex; align-items: flex-start; gap: 10px; }
+  .checkbox {
+    width: 18px; height: 18px;
+    border: 1.5px solid var(--border2);
+    border-radius: 5px;
+    flex-shrink: 0;
+    margin-top: 2px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .checkbox.checked { background: var(--accent); border-color: var(--accent); }
+  .checkbox.checked::after {
+    content: '';
+    width: 9px; height: 6px;
+    border-left: 2px solid #0e0f11;
+    border-bottom: 2px solid #0e0f11;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+
+  .task-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .task-card.done .task-title { text-decoration: line-through; color: var(--muted); }
+
+  .task-actions { display: flex; gap: 4px; }
+
+  .task-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-left: 28px; }
+  .badge {
+    font-size: 11px;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+  }
+  .badge-high    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid rgba(248,113,113,0.2); }
+  .badge-medium  { background: rgba(251,191,36,0.12);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.2); }
+  .badge-low     { background: rgba(200,241,90,0.10);  color: var(--accent-dim); border: 1px solid rgba(200,241,90,0.2); }
+  .badge-tag     { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+  .task-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 6px;
+    padding-left: 28px;
+    line-height: 1.6;
+  }
+  .task-ai-note {
+    font-size: 13px;
+    color: var(--accent-dim);
+    margin-top: 6px;
+    padding-left: 28px;
+    line-height: 1.6;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+  .task-ai-note .ai-icon { flex-shrink: 0; margin-top: 1px; }
+
+  .task-web-note {
+    font-size: 13px;
+    color: #93c5fd;
+    margin-top: 6px;
+    padding-left: 28px;
+    line-height: 1.6;
+    display: flex;
+    gap: 6px;
+    align-items: flex-start;
+  }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Empty State ────────────────────────────────── */
+  .empty {
+    text-align: center;
+    padding: 3.5rem 1rem;
+    color: var(--muted);
+    font-size: 14px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+  }
+  .empty strong { display: block; font-size: 16px; color: var(--text); margin-bottom: 6px; }
+
+  /* ── Modal ──────────────────────────────────────── */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    animation: fadeUp 0.2s ease;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 1.75rem;
+    width: 90%;
+    max-width: 440px;
+    position: relative;
+  }
+  .modal h2 { font-family: 'DM Serif Display', serif; font-weight: 400; font-size: 20px; margin-bottom: 1.25rem; }
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--accent); }
+  .field textarea { height: 80px; resize: none; }
+  .field select option { background: var(--surface2); }
+  .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; gap: 8px; flex-wrap: wrap; }
+  .modal-footer-right { display: flex; gap: 8px; }
+
+  /* ── Scrollbar ──────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+  /* ── Tech Badge ─────────────────────────────────── */
+  .tech-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-top: 2.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  .tech-badge {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .tech-label { font-size: 11px; color: var(--muted); margin-right: 4px; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header class="fade-up">
+    <div>
+      <div class="logo">
+        <div class="logo-dot"></div>
+        <h1>Task<em>AI</em></h1>
+      </div>
+      <p class="tagline">AI-Powered Task Manager</p>
+    </div>
+    <div id="header-date" style="font-size:13px;color:var(--muted);text-align:right"></div>
+  </header>
+
+  <!-- API Key -->
+  <div class="api-banner fade-up delay-1">
+    <label>Anthropic API Key</label>
+    <input type="password" id="api-key-input" placeholder="sk-ant-..." />
+    <button class="save-btn" onclick="saveApiKey()">Save</button>
+    <span class="api-status" id="api-status">Not set</span>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats fade-up delay-2">
+    <div class="stat">
+      <div class="stat-num" id="s-total">0</div>
+      <div class="stat-lbl">Total</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num accent" id="s-done">0</div>
+      <div class="stat-lbl">Done</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="s-left">0</div>
+      <div class="stat-lbl">Remaining</div>
+    </div>
+  </div>
+
+  <!-- Natural Language Input -->
+  <div class="nl-bar fade-up delay-2">
+    <input type="text" id="nl-input"
+      placeholder='Try: "Remind me to review the design mockup — high priority"'
+      onkeydown="if(event.key==='Enter') nlAdd()" />
+    <button class="btn btn-accent btn-sm" onclick="nlAdd()">✦ AI Parse</button>
+  </div>
+  <p class="nl-hint fade-up delay-2">
+    Type anything naturally. AI will extract the <span>title, priority & tags</span> for you.
+  </p>
+
+  <!-- Filters -->
+  <div class="filter-row fade-up delay-3">
+    <button class="filter-pill active" onclick="setFilter('all',this)">All</button>
+    <button class="filter-pill" onclick="setFilter('active',this)">Active</button>
+    <button class="filter-pill" onclick="setFilter('done',this)">Done</button>
+    <button class="filter-pill" onclick="setFilter('high',this)">High priority</button>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm" onclick="openAddModal()">+ Add task</button>
+  </div>
+
+  <!-- Task List -->
+  <div class="task-list" id="task-list"></div>
+
+  <!-- Tech bar -->
+  <div class="tech-bar fade-up">
+    <span class="tech-label">Built with</span>
+    <span class="tech-badge">HTML/CSS/JS</span>
+    <span class="tech-badge">Anthropic API</span>
+    <span class="tech-badge">Web Search</span>
+    <span class="tech-badge">Natural Language Processing</span>
+    <span class="tech-badge">Smart Prioritization</span>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="overlay" id="modal" style="display:none" onclick="closeModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2 id="modal-title">New task</h2>
+    <div class="field">
+      <label>Title</label>
+      <input type="text" id="m-title" placeholder="What needs to be done?" />
+    </div>
+    <div class="field">
+      <label>Description</label>
+      <textarea id="m-desc" placeholder="Add more context..."></textarea>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field">
+        <label>Priority</label>
+        <select id="m-priority">
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Tags (comma separated)</label>
+        <input type="text" id="m-tags" placeholder="work, design, ux" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-sm" onclick="aiFillModal()" style="color:var(--accent);border-color:rgba(200,241,90,0.25)">
+        ✦ AI fill fields
+      </button>
+      <div class="modal-footer-right">
+        <button class="btn btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-sm btn-accent" onclick="saveFromModal()">Save task</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════ */
+let tasks = [];
+let idCounter = 1;
+let filter = 'all';
+let API_KEY = '';
+
+/* ── Boot ─────────────────────────────────── */
+(function init() {
+  const saved = localStorage.getItem('taskAI_v2');
+  if (saved) { const d = JSON.parse(saved); tasks = d.tasks || []; idCounter = d.idCounter || 1; }
+  API_KEY = localStorage.getItem('taskAI_key') || '';
+  if (API_KEY) {
+    document.getElementById('api-key-input').value = API_KEY;
+    setApiStatus(true);
+  }
+  const now = new Date();
+  document.getElementById('header-date').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  render();
+})();
+
+function persist() {
+  localStorage.setItem('taskAI_v2', JSON.stringify({ tasks, idCounter }));
+}
+
+/* ── API Key ──────────────────────────────── */
+function saveApiKey() {
+  API_KEY = document.getElementById('api-key-input').value.trim();
+  localStorage.setItem('taskAI_key', API_KEY);
+  setApiStatus(!!API_KEY);
+}
+function setApiStatus(ok) {
+  const el = document.getElementById('api-status');
+  el.textContent = ok ? 'Ready' : 'Not set';
+  el.className = 'api-status ' + (ok ? 'set' : 'unset');
+}
+
+/* ══════════════════════════════════════════════════
+   ANTHROPIC API HELPERS
+══════════════════════════════════════════════════ */
+async function callClaude(prompt, tools) {
+  if (!API_KEY) { alert('Please set your Anthropic API key first.'); return null; }
+  const body = {
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 400,
+    messages: [{ role: 'user', content: prompt }]
+  };
+  if (tools) body.tools = tools;
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01' }
+    , body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function callClaudeWithSearch(prompt) {
+  if (!API_KEY) { alert('Please set your Anthropic API key first.'); return null; }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'web-search-2025-03-05' },
+    body: JSON.stringify({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 400,
+      tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+  return res.json();
+}
+
+function parseJSON(text) {
+  try { return JSON.parse(text.replace(/```json|```/g, '').trim()); } catch { return null; }
+}
+
+/* ══════════════════════════════════════════════════
+   FEATURE 1: NATURAL LANGUAGE TASK PARSING
+══════════════════════════════════════════════════ */
+async function nlAdd() {
+  const input = document.getElementById('nl-input');
+  const raw = input.value.trim();
+  if (!raw) return;
+  input.disabled = true;
+
+  const tempId = idCounter++;
+  tasks.unshift({ id: tempId, title: raw, desc: '', priority: 'medium', tags: '', done: false, loading: true, aiNote: '', webNote: '' });
+  render();
+
+  const data = await callClaude(
+    `Parse this natural language task request into JSON with keys: title, priority (high/medium/low), tags (comma-separated string, max 3). Respond ONLY with valid JSON, no markdown.
+Input: "${raw}"`
+  );
+
+  const t = tasks.find(t => t.id === tempId);
+  if (t) {
+    const text = data?.content?.find(b => b.type === 'text')?.text || '';
+    const parsed = parseJSON(text);
+    if (parsed) {
+      t.title    = parsed.title    || raw;
+      t.priority = parsed.priority || 'medium';
+      t.tags     = parsed.tags     || '';
+    }
+    t.loading = false;
+  }
+  input.value = '';
+  input.disabled = false;
+  persist(); render();
+}
+
+/* ══════════════════════════════════════════════════
+   FEATURE 2: AI FILL MODAL FIELDS
+══════════════════════════════════════════════════ */
+async function aiFillModal() {
+  const title = document.getElementById('m-title').value.trim();
+  if (!title) { alert('Enter a title first.'); return; }
+  const descEl  = document.getElementById('m-desc');
+  const prioEl  = document.getElementById('m-priority');
+  const tagsEl  = document.getElementById('m-tags');
+  descEl.value = 'Generating…'; descEl.disabled = true;
+
+  const data = await callClaude(
+    `For the task titled "${title}", return ONLY valid JSON with keys: description (1 concise sentence), priority (high/medium/low), tags (comma-separated, max 3). No markdown.`
+  );
+
+  const text   = data?.content?.find(b => b.type === 'text')?.text || '';
+  const parsed = parseJSON(text);
+  if (parsed) {
+    descEl.value  = parsed.description || '';
+    prioEl.value  = parsed.priority    || 'medium';
+    tagsEl.value  = parsed.tags        || '';
+  }
+  descEl.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════
+   FEATURE 3: AI SMART ASSIST (tip + next step)
+══════════════════════════════════════════════════ */
+async function aiAssist(id) {
+  const t = tasks.find(t => t.id === id);
+  if (!t || t.loading) return;
+  t.loading = true; render();
+
+  const data = await callClaude(
+    `Task: "${t.title}"${t.desc ? ' — ' + t.desc : ''}
+Give ONE actionable next step or productivity tip in 1-2 sentences. Be specific and direct. No preamble.`
+  );
+
+  t.loading  = false;
+  t.aiNote   = data?.content?.find(b => b.type === 'text')?.text?.trim() || 'No suggestion available.';
+  persist(); render();
+}
+
+/* ══════════════════════════════════════════════════
+   FEATURE 4: WEB SEARCH ENRICHMENT
+══════════════════════════════════════════════════ */
+async function webEnrich(id) {
+  const t = tasks.find(t => t.id === id);
+  if (!t || t.loading) return;
+  t.loading = true; render();
+
+  const data = await callClaudeWithSearch(
+    `I have a task: "${t.title}". Search the web and give me 1-2 sentences of relevant, current information or a useful resource that would help complete this task. Be concise and direct.`
+  );
+
+  t.loading = false;
+  const text = data?.content?.filter(b => b.type === 'text').map(b => b.text).join(' ').trim();
+  t.webNote  = text || 'No web results found.';
+  persist(); render();
+}
+
+/* ══════════════════════════════════════════════════
+   RENDER
+══════════════════════════════════════════════════ */
+function render() {
+  // Stats
+  const done = tasks.filter(t => t.done).length;
+  document.getElementById('s-total').textContent = tasks.length;
+  document.getElementById('s-done').textContent  = done;
+  document.getElementById('s-left').textContent  = tasks.length - done;
+
+  // Filter
+  const visible = tasks.filter(t => {
+    if (filter === 'active') return !t.done;
+    if (filter === 'done')   return t.done;
+    if (filter === 'high')   return t.priority === 'high';
+    return true;
+  });
+
+  const list = document.getElementById('task-list');
+  if (!visible.length) {
+    list.innerHTML = `<div class="empty"><strong>No tasks here</strong>Add one above or switch filters.</div>`;
+    return;
+  }
+
+  list.innerHTML = visible.map(t => `
+    <div class="task-card ${t.done ? 'done' : ''}">
+      <div class="task-top">
+        <div class="checkbox ${t.done ? 'checked' : ''}" onclick="toggle(${t.id})"></div>
+        <div class="task-title">${esc(t.title)}</div>
+        <div class="task-actions">
+          ${!t.done ? `
+            <button class="btn-icon btn" title="AI assist" onclick="aiAssist(${t.id})">✦</button>
+            <button class="btn-icon btn" title="Web search" onclick="webEnrich(${t.id})" style="font-size:13px">⌕</button>
+          ` : ''}
+          <button class="btn-icon btn" title="Delete" onclick="deleteTask(${t.id})">✕</button>
+        </div>
+      </div>
+
+      <div class="task-meta">
+        <span class="badge badge-${t.priority}">${t.priority}</span>
+        ${(t.tags || '').split(',').map(s => s.trim()).filter(Boolean).map(tag =>
+          `<span class="badge badge-tag">${esc(tag)}</span>`
+        ).join('')}
+      </div>
+
+      ${t.desc ? `<div class="task-desc">${esc(t.desc)}</div>` : ''}
+
+      ${t.loading ? `
+        <div class="task-ai-note">
+          <span class="spinner"></span>
+          <span>Thinking…</span>
+        </div>` : ''}
+
+      ${!t.loading && t.aiNote ? `
+        <div class="task-ai-note">
+          <span class="ai-icon">✦</span>
+          <span>${esc(t.aiNote)}</span>
+        </div>` : ''}
+
+      ${!t.loading && t.webNote ? `
+        <div class="task-web-note">
+          <span class="ai-icon">⌕</span>
+          <span>${esc(t.webNote)}</span>
+        </div>` : ''}
+    </div>
+  `).join('');
+}
+
+function esc(s) {
+  return String(s || '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ══════════════════════════════════════════════════
+   TASK ACTIONS
+══════════════════════════════════════════════════ */
+function toggle(id) {
+  const t = tasks.find(t => t.id === id);
+  if (t) { t.done = !t.done; persist(); render(); }
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  persist(); render();
+}
+
+function setFilter(f, el) {
+  filter = f;
+  document.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+/* ── Modal ────────────────────────────────── */
+function openAddModal() {
+  ['m-title','m-desc','m-tags'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('m-priority').value = 'medium';
+  document.getElementById('modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('m-title').focus(), 50);
+}
+
+function closeModal(e) {
+  if (!e || e.target.id === 'modal') document.getElementById('modal').style.display = 'none';
+}
+
+function saveFromModal() {
+  const title = document.getElementById('m-title').value.trim();
+  if (!title) return;
+  tasks.unshift({
+    id: idCounter++,
+    title,
+    desc:     document.getElementById('m-desc').value.trim(),
+    priority: document.getElementById('m-priority').value,
+    tags:     document.getElementById('m-tags').value.trim(),
+    done: false, loading: false, aiNote: '', webNote: ''
+  });
+  persist(); closeModal(); render();
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Enter' && document.getElementById('modal').style.display === 'flex') saveFromModal();
+});
+</script>
+</body>
+</html>
